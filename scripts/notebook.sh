@@ -1,0 +1,1 @@
+docker run -d --user root -e NB_UID=5000 --name notebook -v /home/nandanrao:/home/jovyan/work -p 8888:8888 jupyter/datascience-notebook start-notebook.sh --NotebookApp.token='' --NotebookApp.disable_check_xsrf=True

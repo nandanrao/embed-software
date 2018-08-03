@@ -1,0 +1,1 @@
+docker run --name docspace -d -v /home/nandanrao:/starspace/mount nandanrao/starspace Starspace/starspace train -trainFile mount/by_repo.txt -model mount/docspace -dim 300 -ngrams 2 -minCount 20  -trainMode 2 -negSearchLimit 100 -fileFormat labelDoc
