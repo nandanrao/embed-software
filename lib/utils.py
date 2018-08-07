@@ -1,6 +1,7 @@
 import requests
 import numpy as np
 import linecache
+from lib.preprocess import preprocessor
 
 def get_readme(repo, attempts = 0):
     filenames = [ 'README.md', 'readme.md']
