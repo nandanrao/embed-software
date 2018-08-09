@@ -2,24 +2,29 @@ import requests
 import numpy as np
 import linecache
 from lib.preprocess import preprocessor
+import concurrent
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def get_readme(repo, attempts = 0):
-    filenames = [ 'README.md', 'readme.md']
+    filenames = [ 'README.md', 'readme.md', 'Readme.md', 'readme.txt', 'README.txt', 'Readme.txt']
     try: 
         f = filenames[attempts]
     except IndexError:
+        print('REPO 404: {}'.format(repo))
         return None
     r = requests.get('https://raw.githubusercontent.com/{}/master/{}'.format(repo, f))
     if r.status_code == 404:
         return get_readme(repo, attempts + 1)
     return preprocessor(r.text)
 
+def get_all_readmes(repos):
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        return executor.map(get_readme, repos)
+    
 def write_ai_readmes(repos, filename):
     with open(filename, 'w') as f:
-        for repo in repos:
-            text = get_readme(repo)
-            if text:
-                f.write(text + '\n')
+        texts = get_all_readmes(repos)
+        [f.write(text+'\n') for text in texts if text]
 
 def get_embeddings(filename, size):
     embeddings = np.ones((size, 100))
