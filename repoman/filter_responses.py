@@ -10,17 +10,16 @@ import pandas as pd
 import numpy as np
 import json
 import time
-import grequests
 from pymongo import MongoClient
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 import os
 from pathlib import Path
 import pprint
 
 # Connect to MongoDB
 def connect_to_db():
-    p = Path(".") / ".env"
-    load_dotenv(dotenv_path = p, verbose=True)
+#     p = Path(".") / ".env"
+#     load_dotenv(dotenv_path = p, verbose=True)
     client = MongoClient(os.getenv('MONGO_HOST'),
                      username = os.getenv('MONGO_USER'),
                      password = os.getenv('MONGO_PASSWORD'))

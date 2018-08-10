@@ -5,14 +5,22 @@ from lib.preprocess import preprocessor
 import concurrent
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
+import subprocess 
+from copy import deepcopy
+    
+def embed_docs(model_path, input):
+    p = subprocess.Popen(["embed_doc", model_path], 
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE, encoding='utf-8')    
 
+    o,e = p.communicate(input=input)
+    return np.array(get_ss_embed(o))
 
 def get_readme(repo, attempts = 0):
     """ Get readmes from Github and run through our preprocessor """
     names = ['README', 'readme', 'Readme']
-    endings = ['', 'md', 'txt', 'markdown']
+    endings = ['.md', '', '.txt', '.markdown', '.rst']
     filenames = [n+e for n in names for e in endings]
-    print(filenames)
     try: 
         f = filenames[attempts]
     except IndexError:
@@ -23,12 +31,12 @@ def get_readme(repo, attempts = 0):
         return get_readme(repo, attempts + 1)
     return preprocessor(r.text)
 
-def get_all_readmes(repos):
-    with ThreadPoolExecutor(max_workers=100) as executor:
+def get_all_readmes(repos, max_workers):
+    with ThreadPoolExecutor(max_workers) as executor:
         return executor.map(get_readme, repos)
     
-def get_ai_readmes(repos, filename):
-    texts = get_all_readmes(repos)
+def get_ai_readmes(repos, filename, workers = 100):
+    texts = get_all_readmes(repos, workers)
     return reduce(lambda r,t: r + t + '\n' if t else r, texts, '')
 
 def get_embeddings(filename, size):
