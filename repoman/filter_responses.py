@@ -11,15 +11,46 @@ import numpy as np
 import json
 import time
 from pymongo import MongoClient
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 import os
 from pathlib import Path
 import pprint
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from scipy.sparse import csr_matrix, lil_matrix
+from scipy.optimize import brute
+from scipy.special import expit
+from sklearn.metrics import fbeta_score
+from scipy.stats import gamma
+
+
+# Hand-labelled papers to classify.
+# Add more negative papers to make model more conservative!!
+POSITIVE_PAPERS = [
+    "Gaussian Processes for Big Data",
+    "NewsWeeder: Learning to Filter Netnews",
+    "Object Detection with Grammar Models",
+    "Dropout Training as Adaptive Regularization",
+    "Large-scale L-BFGS using MapReduce",
+    "Monte-Carlo Planning in Large POMDPs",
+    "The Infinite Gaussian Mixture Model",
+    "Deep Generative Image Models using a Laplacian Pyramid of Adversarial Networks",
+    "DeCAF: A Deep Convolutional Activation Feature for Generic Visual Recognition",
+    "Two-Stream Convolutional Networks for Action Recognition in Videos"
+]
+NEGATIVE_PAPERS = [
+    "How to Train Neural Networks",
+    "kernel bayes' rule",
+    "Self-taught clustering",
+    "real-time particle filters",
+    "How Neural Nets Work",
+    "Direct and Indirect Effects",
+    "Separating Style and Content",
+    "Management of Uncertainty",
+    "Adaptive Online Learning"
+]
 
 # Connect to MongoDB
 def connect_to_db():
-#     p = Path(".") / ".env"
-#     load_dotenv(dotenv_path = p, verbose=True)
     client = MongoClient(os.getenv('MONGO_HOST'),
                      username = os.getenv('MONGO_USER'),
                      password = os.getenv('MONGO_PASSWORD'))
@@ -57,7 +88,7 @@ def create_repo_dict(all_responses):
                 items = response["response"]["items"]
                 repo_list = [repo["full_name"] for repo in items]
                 repo_dict = add_repos_to_dict(repo_dict, repo_list, title)
-                title_dict[title] = repo_list
+                title_dict[title] = has_items
         else:
             error_queries.append(response["_id"])
     return repo_dict, title_dict, error_queries
@@ -81,13 +112,11 @@ def concat_titles(title):
 ### A max_paper_per_repo number of papers cited;
 ### Excludes papers whose title short_word_limit number of words or fewer,
     # and have more than max_repo_per_title number of repos which cite them.
-
 def get_dicts():
     collection = connect_to_db()
     all_responses = collection.find({})
     repo_dict, title_dict, error_queries = create_repo_dict(all_responses)
     return repo_dict, title_dict
-
 
 
 def filter_repeats(l):
@@ -101,17 +130,7 @@ def filter_repeats(l):
     return [s for i,s in enumerate(l) if i in uniques]
 
 
-from scipy.sparse import csr_matrix, lil_matrix
-
-def get_titles(repo_dict):
-    u = [i for v in repo_dict.values() for i in v]
-    unique_titles = np.array(list(set(u)))
-    return unique_titles
-
-
-def get_sparse_matrix(repo_dict):
-    titles = get_titles(repo_dict)
-
+def get_sparse_matrix(repo_dict, titles):
     # Just boilerplate CSR building
     indptr = [0]
     indices = []
@@ -123,43 +142,101 @@ def get_sparse_matrix(repo_dict):
             data.append(1)
         indptr.append(len(indices))
 
-    return csr_matrix((data, indices, indptr)).tocsc(), titles
+    return csr_matrix((data, indices, indptr)).tocsc()
 
 
-def filter_repos(repo_dict, max_paper_per_repo, paper_filters):
+def test_df():
+    """ Just makes a dataframe with our hand-labelled papers """
+    df = pd.DataFrame({'title': POSITIVE_PAPERS + NEGATIVE_PAPERS, 'label': 1})
+    df.loc[len(POSITIVE_PAPERS):,'label'] = 0
+    return df
 
-    # Make sparse matrix > repos x titles
-    m, titles = get_sparse_matrix(repo_dict)
-    repos = np.array(list(repo_dict.keys()))
+# Helper functions for sparse matrix summing
+row_sum = lambda m: np.asarray(m.sum(1)).reshape(-1)
+col_sum = lambda m: np.asarray(m.sum(0)).reshape(-1)
+
+class TitleClassifier:
+    """ Uses word count with Gamma prior over repo count to classify papers """
+    def __init__(self, vectorizer = CountVectorizer(), beta = 0.25):
+        self.vectorizer = vectorizer
+        self.beta = beta
+
+    def fit(self, titles, counts, X, y):
+        self.titles = titles
+        self.counts = counts
+        self.vecs = self.vectorizer.fit_transform(self.titles)
+
+        self.X = X
+        self.y = y
+
+        params = brute(self._set_and_test, ((0.33, 2.5), (20, 60)), Ns = 20)
+        self._set_params(params)
+
+    def _set_params(self, args):
+        self.thresh, self.gamma_scale = args
+
+    def _set_and_test(self, args):
+        self.thresh, self.gamma_scale = args
+        return self._get_loss()
+
+    def _get_loss(self):
+        preds = self.predict(self.X)
+        return 1 / fbeta_score(self.y, preds, self.beta)
+
+    def predict_proba(self, titles):
+        i = [np.argwhere(title == self.titles)[0][0] for title in titles]
+        word_count = row_sum(self.vecs[i])
+        repo_count = self.counts[i]
+        regularization = gamma.pdf(repo_count, 1, 0, self.gamma_scale)
+        score = word_count * regularization * 10
+        return expit(score - self.thresh)
+
+    def predict(self, titles):
+        decision = self.predict_proba(titles)
+        return decision > .5
+
+
+def filter_repos(repo_dict, title_dict, summary_repo_threshold):
 
     # Helper functions to sum row- and column-wise
-    num_papers = lambda m: np.asarray(m.sum(1)).reshape(-1)
-    num_repos = lambda m: np.asarray(m.sum(0)).reshape(-1)
+    num_papers, num_repos = row_sum, col_sum
 
-    # Filter colummns based on filters over titles
-    for word_limit, max_repo_per_paper in paper_filters:
-        lengths = pd.Series(titles).map(lambda s: len(s.split(' '))).values
-        idx = (num_repos(m) <= max_repo_per_paper) | (lengths > word_limit)
-        m,titles = m[:,idx], titles[idx]
+    # Make arrays and sparse matrix of values
+    repos = np.array(list(repo_dict.keys()))
+    titles = np.array(list(title_dict.keys()))
+    counts = np.array(list(title_dict.values()))
+    m = get_sparse_matrix(repo_dict, titles)
 
-    # Return repos with correct number of papers, accounting
-    # for the removed papers.
-    idx = (num_papers(m) > 0) & (num_papers(m) <= max_paper_per_repo)
+    # initial sanity check to remove summary repos
+    idx = num_papers(m) <= summary_repo_threshold
+    counts += (num_repos(m[idx,:]) - num_repos(m))
+    m, repos = m[idx, :], repos[idx]
+
+    # classify papers as "real titles" or "common phrases"
+    df = test_df()
+    c = TitleClassifier(beta = .25)
+    c.fit(titles, counts, df.title, df.label)
+    idx = c.predict(titles)
+    m, titles = m[:, idx], titles[idx]
+
+    # Return repos with at least one paper
+    idx = (num_papers(m) > 0)
     return repos[idx], titles
 
 
-def get_repos_titles(max_paper_per_repo, paper_filters):
-
+def get_repos_titles(summary_repo_threshold):
     # Connect to the database and get all query responses
     repo_dict, title_dict = get_dicts()
     repo_dict = {k:filter_repeats(v) for k,v in repo_dict.items()}
-
-    final_repos, final_titles = filter_repos(repo_dict, max_paper_per_repo, paper_filters)
+    final_repos, final_titles = filter_repos(repo_dict,
+                                             title_dict,
+                                             summary_repo_threshold)
     return final_repos
 
-
 if __name__ == '__main__':
-    repos = get_repos_titles(1, [(2,1), (5, 5)])
+    p = Path(".") / ".env"
+    load_dotenv(dotenv_path = p, verbose=True)
+    repos = get_repos_titles(5)
     with open('repos.txt', 'w') as f:
         for repo in repos:
             f.write(repo+'\n')
