@@ -8,13 +8,9 @@ Created on Wed Aug  8 16:19:38 2018
 
 import pandas as pd
 import numpy as np
-import json
-import time
+import json, time, os, logging, pprint
 from pymongo import MongoClient
-from dotenv import load_dotenv
-import os
 from pathlib import Path
-import pprint
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from scipy.sparse import csr_matrix, lil_matrix
 from scipy.optimize import brute
@@ -35,7 +31,13 @@ POSITIVE_PAPERS = [
     "The Infinite Gaussian Mixture Model",
     "Deep Generative Image Models using a Laplacian Pyramid of Adversarial Networks",
     "DeCAF: A Deep Convolutional Activation Feature for Generic Visual Recognition",
-    "Two-Stream Convolutional Networks for Action Recognition in Videos"
+    "Two-Stream Convolutional Networks for Action Recognition in Videos",
+    "Dueling Network Architectures for Deep Reinforcement Learning",
+    "Auxiliary Deep Generative Models",
+    "Boosting for transfer learning",
+    "A Neural Probabilistic Language Model",
+    "Maximum Margin Temporal Clustering",
+    "Learning to rank using gradient descent"
 ]
 NEGATIVE_PAPERS = [
     "How to Train Neural Networks",
@@ -46,7 +48,14 @@ NEGATIVE_PAPERS = [
     "Direct and Indirect Effects",
     "Separating Style and Content",
     "Management of Uncertainty",
-    "Adaptive Online Learning"
+    "Adaptive Online Learning",
+    "Learning Model Bias",
+    "Latent Bandits",
+    "Noisy Activation Functions",
+    "Leaving the Span",
+    "Bayesian PCA",
+    "Learning Rotations",
+    "Robustness and Generalization"
 ]
 
 # Connect to MongoDB
@@ -214,10 +223,12 @@ def filter_repos(repo_dict, title_dict, summary_repo_threshold):
 
     # classify papers as "real titles" or "common phrases"
     df = test_df()
-    c = TitleClassifier(beta = .25)
+    c = TitleClassifier(beta = .33)
     c.fit(titles, counts, df.title, df.label)
     idx = c.predict(titles)
     m, titles = m[:, idx], titles[idx]
+    logging.info('Classified with threshold: {} \
+    and Gamma scale: {}'.format(c.thresh, c.gamma_scale))
 
     # Return repos with at least one paper
     idx = (num_papers(m) > 0)
@@ -234,6 +245,8 @@ def get_repos_titles(summary_repo_threshold):
     return final_repos
 
 if __name__ == '__main__':
+    from dotenv import load_dotenv
+
     p = Path(".") / ".env"
     load_dotenv(dotenv_path = p, verbose=True)
     repos = get_repos_titles(5)
