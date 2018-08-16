@@ -249,7 +249,7 @@ if __name__ == '__main__':
 
     p = Path(".") / ".env"
     load_dotenv(dotenv_path = p, verbose=True)
-    repos = get_repos_titles(5)
+    repos = get_repos_titles(12)
     with open('repos.txt', 'w') as f:
         for repo in repos:
             f.write(repo+'\n')

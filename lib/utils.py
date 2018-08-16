@@ -7,6 +7,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
 import subprocess 
 from copy import deepcopy
+from hashlib import md5
+from diskcache import FanoutCache
+
+cache = FanoutCache('repo_cache/fanoutcache')
+
+def get_ids(locs):
+    with open('prepared-readmes/file_lookup.csv', 'r') as f:
+        return [l.split(',')[0] for i,l in enumerate(f) if i in locs]
     
 def embed_docs(model_path, input):
     p = subprocess.Popen(["embed_doc", model_path], 
@@ -16,6 +24,7 @@ def embed_docs(model_path, input):
     o,e = p.communicate(input=input)
     return np.array(get_ss_embed(o))
 
+@cache.memoize(typed=True, expire=None, tag='readme')
 def get_readme(repo, attempts = 0):
     """ Get readmes from Github and run through our preprocessor """
     names = ['README', 'readme', 'Readme']
@@ -31,14 +40,11 @@ def get_readme(repo, attempts = 0):
         return get_readme(repo, attempts + 1)
     return preprocessor(r.text)
 
-def get_all_readmes(repos, max_workers):
-    with ThreadPoolExecutor(max_workers) as executor:
-        return executor.map(get_readme, repos)
+def get_ai_readmes(repos, workers):
+    with ThreadPoolExecutor(workers) as executor:
+        texts = executor.map(get_readme, repos)
+        return [t for t in texts if t]
     
-def get_ai_readmes(repos, filename, workers = 100):
-    texts = get_all_readmes(repos, workers)
-    return reduce(lambda r,t: r + t + '\n' if t else r, texts, '')
-
 def get_embeddings(filename, size):
     embeddings = np.ones((size, 100))
     with open(filename, 'r') as f:
