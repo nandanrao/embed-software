@@ -59,7 +59,7 @@ def get_embeddings(filename, size):
     return embeddings
 
 def get_sentence(i):
-    return linecache.getline('./prepared-readmes/by_repo.txt', i+1)
+    return linecache.getline('./prepared-readmes/repos.txt', i+1)
 
 def get_ss_embed(out):
     arr = out.split('\n')[4:]
