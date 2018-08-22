@@ -1,1 +1,1 @@
-docker run -d -v /home/nandanrao:/starspace/mount nandanrao/starspace Starspace/starspace train -trainFile mount/by_repo.txt -model mount/sentencespace -dim 200 -ngrams 2 -minCount 20 -trainMode 3 -negSearchLimit 100 -fileFormat labelDoc -thread 24
+docker run -d -v /home/nandanrao:/starspace/mount --name sentencespace nandanrao/starspace Starspace/starspace train -trainFile mount/${1} -model mount/${2} -dim 100 -ngrams 1 -p 1 -minCount 20 -trainMode 3 -negSearchLimit 100 -fileFormat labelDoc -thread 24
