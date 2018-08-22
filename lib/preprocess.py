@@ -32,7 +32,7 @@ def preprocessor(s):
     # never useful. Get rid of anything in camelcase? 
     s = re.sub(underscore, '', s)
 
-
+    # TODO: do make your "sentance" the whole paragraph? Closer to full document representation? 
     # Split on sentances, tokenize within the sentance, then replace 
     # sentance with \t separator for starspace/fasttext
     s = [i for i in sentance.split(s)]

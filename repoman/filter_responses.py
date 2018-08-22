@@ -58,11 +58,15 @@ NEGATIVE_PAPERS = [
     "Robustness and Generalization"
 ]
 
+def get_mongo_client():
+    client = MongoClient(os.getenv('MONGO_HOST'),
+                         username = os.getenv('MONGO_USER'),
+                         password = os.getenv('MONGO_PASSWORD'))
+    return client
+
 # Connect to MongoDB
 def connect_to_db():
-    client = MongoClient(os.getenv('MONGO_HOST'),
-                     username = os.getenv('MONGO_USER'),
-                     password = os.getenv('MONGO_PASSWORD'))
+    client = get_mongo_client()
     db = client.githubresults
     collection = db.dblp_returns
     return collection
