@@ -41,9 +41,9 @@ POSITIVE_PAPERS = [
 ]
 NEGATIVE_PAPERS = [
     "How to Train Neural Networks",
-    "kernel bayes' rule",
+    "Kernel Bayes' Rule",
     "Self-taught clustering",
-    "real-time particle filters",
+    "Real-Time Particle Filters",
     "How Neural Nets Work",
     "Direct and Indirect Effects",
     "Separating Style and Content",
@@ -58,18 +58,6 @@ NEGATIVE_PAPERS = [
     "Robustness and Generalization"
 ]
 
-def get_mongo_client():
-    client = MongoClient(os.getenv('MONGO_HOST'),
-                         username = os.getenv('MONGO_USER'),
-                         password = os.getenv('MONGO_PASSWORD'))
-    return client
-
-# Connect to MongoDB
-def connect_to_db():
-    client = get_mongo_client()
-    db = client.githubresults
-    collection = db.dblp_returns
-    return collection
 
 # Function adds or appends a new title as a value given a repo as key
 def add_repo_to_dict(repo_dict, repo, title):
@@ -121,16 +109,30 @@ def concat_titles(title):
         title = ' '.join(title)
     return title
 
+def read_gh_results(path):
+    with open(path, 'r') as f:
+        return [json.loads(l) for l in f.readlines()]
+    
+def get_title_conference_lookup(confs):
+    df = pd.read_csv('conferences/core_dblp_sco_oecd.csv', 
+                     usecols=['acron', 'title', 'ITEM_ID'])
+    df['title'] = df.title.str.replace('\.$', '')
+    df = df.set_index('title')
+    if confs: 
+        df = df[df.acron.isin(confs)]
+    lookup = df.to_dict(orient='id')
+    return lookup
+
 # Function returns repos which have:
 ### A max_paper_per_repo number of papers cited;
 ### Excludes papers whose title short_word_limit number of words or fewer,
-    # and have more than max_repo_per_title number of repos which cite them.
-def get_dicts():
-    collection = connect_to_db()
-    all_responses = collection.find({})
+# and have more than max_repo_per_title number of repos which cite them.    
+def get_dicts(gh_results_path, confs):
+    gh_results = read_gh_results(gh_results_path)
+    lookup = get_title_conference_lookup(confs)    
+    all_responses = [r for r in gh_results if lookup.get(r['_id'])]
     repo_dict, title_dict, error_queries = create_repo_dict(all_responses)
     return repo_dict, title_dict
-
 
 def filter_repeats(l):
     """ Filters case-insensitive repeats from list, taking last element """
@@ -197,6 +199,11 @@ class TitleClassifier:
         return 1 / fbeta_score(self.y, preds, self.beta)
 
     def predict_proba(self, titles):
+        for title in titles:
+            try: 
+                np.argwhere(title == self.titles)[0][0]
+            except IndexError:
+                print(title)
         i = [np.argwhere(title == self.titles)[0][0] for title in titles]
         word_count = row_sum(self.vecs[i])
         repo_count = self.counts[i]
@@ -239,9 +246,9 @@ def filter_repos(repo_dict, title_dict, summary_repo_threshold):
     return repos[idx], titles
 
 
-def get_repos_titles(summary_repo_threshold):
+def get_repos_titles(gh_results_path, confs, summary_repo_threshold):
     # Connect to the database and get all query responses
-    repo_dict, title_dict = get_dicts()
+    repo_dict, title_dict = get_dicts(gh_results_path, confs)
     repo_dict = {k:filter_repeats(v) for k,v in repo_dict.items()}
     final_repos, final_titles = filter_repos(repo_dict,
                                              title_dict,
@@ -249,10 +256,6 @@ def get_repos_titles(summary_repo_threshold):
     return final_repos
 
 if __name__ == '__main__':
-    from dotenv import load_dotenv
-
-    p = Path(".") / ".env"
-    load_dotenv(dotenv_path = p, verbose=True)
     repos = get_repos_titles(12)
     with open('repos.txt', 'w') as f:
         for repo in repos:
