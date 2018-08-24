@@ -27,7 +27,7 @@ RUN \
 
 # build starspace
 RUN \
-	git clone https://github.com/facebookresearch/Starspace.git && \
+	git clone https://github.com/nandanrao/Starspace.git && \
 	cd Starspace && \
 	make && \
 	make embed_doc && \
