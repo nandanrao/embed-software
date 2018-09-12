@@ -15,12 +15,13 @@ num = re.compile(r'[0-9]+')
 
 tokenizer = lambda doc: token_pattern.findall(doc)
 
-def claims_processor(s):
+def claims_processor(s, numbers = False):
     # Lowercase
     s = s.lower()
     
     # Get rid of numbers in patents
-    s = re.sub(num, '', s) if s else None
+    if numbers is False:
+        s = re.sub(num, '', s) if s else None
     
     # URLs and ASCII only
     s = re.sub(links, '', s)
@@ -50,16 +51,17 @@ def readme_processor(s):
     
 
 class Preprocessor():
-    def __init__(self, string_processor, min_words_per_sentence):
+    def __init__(self, string_processor, min_words_per_sentence, **kwargs):
         self.string_processor = string_processor
         self.min_words_per_sentence = min_words_per_sentence
+        self.string_processor_kwargs = kwargs
     
     def process(self, s):
         MIN_SENTENCES_PER_DOC = 2
         MIN_CHARS_PER_DOC = 25
         char_count = len(s)
 
-        s = self.string_processor(s)
+        s = self.string_processor(s, **self.string_processor_kwargs)
 
         # TODO: do make your "sentance" the whole paragraph? Closer to full document representation? 
         # Split on sentances, tokenize within the sentance, then replace 
