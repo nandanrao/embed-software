@@ -9,8 +9,10 @@ import subprocess
 from copy import deepcopy
 from hashlib import md5
 from diskcache import FanoutCache
+from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 
 cache = FanoutCache('repo_cache/fanoutcache')
+REPO_STOP_WORDS = ENGLISH_STOP_WORDS | frozenset(['et', 'al', 'pdf', 'star'])
 
 def get_ids(locs):
     with open('prepared-readmes/file_lookup.csv', 'r') as f:
@@ -45,8 +47,8 @@ def get_ai_readmes(repos, workers):
         texts = executor.map(get_readme, repos)
         return [t for t in texts if t]
     
-def get_embeddings(filename, size):
-    embeddings = np.ones((size, 100))
+def get_embeddings(filename, size, dims = 100):
+    embeddings = np.ones((size, dims))
     with open(filename, 'r') as f:
         j = 0
         for i,l in enumerate(f):
@@ -71,10 +73,12 @@ def get_repo_name(i):
     """Get id from lookup... then get name from bigquery table? """
     pass
     
-def predict_ai(model, pos, X):
+def predict_ai(model, pos, X = None):
     """ pos is the positive class vectors, X is the entire dataset """    
     model = deepcopy(model)
     model.fit(pos)
+    if X is None:
+        return model
     preds = model.predict(X)
     return np.argwhere(preds == 1), model
 
@@ -83,3 +87,13 @@ def print_random(pos, amt=30):
     np.random.shuffle(pos)
     for p in pos[0:30]: 
         print(get_sentence(p[0]))
+        
+def write_predictions(pos, filename):
+    with open(filename, 'w') as f:
+        for p in pos.reshape(-1):
+            f.write('{}\n'.format(p))
+
+def get_predictions(filename):
+    with open(filename, 'r') as f:
+        return [int(i) for i in f.read().split('\n') if i]
+        
