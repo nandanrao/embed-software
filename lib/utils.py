@@ -14,9 +14,13 @@ from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 cache = FanoutCache('repo_cache/fanoutcache')
 REPO_STOP_WORDS = ENGLISH_STOP_WORDS | frozenset(['et', 'al', 'pdf', 'star'])
 
+
+
+def get_id(i):
+    return linecache.getline('./prepared-readmes/file_lookup.csv', i+1).split(',')[0]
+
 def get_ids(locs):
-    with open('prepared-readmes/file_lookup.csv', 'r') as f:
-        return [l.split(',')[0] for i,l in enumerate(f) if i in locs]
+    return [get_id(i) for i in locs]
     
 def embed_docs(model_path, input):
     p = subprocess.Popen(["embed_doc", model_path], 

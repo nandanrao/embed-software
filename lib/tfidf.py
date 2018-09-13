@@ -21,7 +21,7 @@ def embed(readmes, gh_dict):
     vectorizer = TfidfVectorizer(stop_words = REPO_STOP_WORDS, vocabulary = gh_dict.token2id)
     docs = chain(all_readmes('prepared-readmes/repos.txt'), readmes)
     tfidf_embeddings = vectorizer.fit_transform(docs)
-    return tfidf_embeddings
+    return tfidf_embeddings, vectorizer
 
 def make_predictions(model, embeddings, readmes, save=''):
     model.fit(embeddings[-len(readmes):])
