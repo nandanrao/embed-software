@@ -1,7 +1,7 @@
 import requests
 import numpy as np
 import linecache
-from lib.preprocess import preprocessor
+from lib.preprocess import Preprocessor, readme_processor
 import concurrent
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
@@ -44,6 +44,7 @@ def get_readme(repo, attempts = 0):
     r = requests.get('https://raw.githubusercontent.com/{}/master/{}'.format(repo, f))
     if r.status_code == 404:
         return get_readme(repo, attempts + 1)
+    preprocessor = Preprocessor(readme_processor, 2).process
     return preprocessor(r.text)
 
 def get_ai_readmes(repos, workers):
@@ -64,8 +65,14 @@ def get_embeddings(filename, size, dims = 100):
                 break
     return embeddings
 
-def get_sentence(i):
-    return linecache.getline('./prepared-readmes/repos.txt', i+1)
+def get_sentence(i, path):
+    return linecache.getline(path, i+1)
+
+def print_random(pos, amt=30, path = './prepared-readmes/repos.txt'):
+    print('Printing {}/{} positive documents'.format(amt, len(pos)))
+    np.random.shuffle(pos)
+    for p in pos[0:30]: 
+        print(get_sentence(p[0], path))
 
 def get_ss_embed(out):
     arr = out.split('\n')[4:]
@@ -85,12 +92,6 @@ def predict_ai(model, pos, X = None):
         return model
     preds = model.predict(X)
     return np.argwhere(preds == 1), model
-
-def print_random(pos, amt=30):
-    print('Printing {}/{} positive documents'.format(amt, len(pos)))
-    np.random.shuffle(pos)
-    for p in pos[0:30]: 
-        print(get_sentence(p[0]))
         
 def write_predictions(pos, filename):
     with open(filename, 'w') as f:
