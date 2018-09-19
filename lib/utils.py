@@ -2,7 +2,7 @@ import requests
 import re
 import numpy as np
 import linecache
-from .preprocess import preprocessor
+from lib.preprocess import Preprocessor, readme_processor
 import concurrent
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
@@ -10,8 +10,10 @@ import subprocess
 from copy import deepcopy
 from hashlib import md5
 from diskcache import FanoutCache
+from sklearn.feature_extraction.stop_words import ENGLISH_STOP_WORDS
 
 cache = FanoutCache('repo_cache/fanoutcache')
+REPO_STOP_WORDS = ENGLISH_STOP_WORDS | frozenset(['et', 'al', 'pdf', 'star'])
 
 def get_ids(locs):
     with open('prepared-readmes/file_lookup.csv', 'r') as f:
@@ -52,6 +54,7 @@ def get_readme(repo, attempts = 0):
     r = requests.get('https://raw.githubusercontent.com/{}/master/{}'.format(repo, f))
     if r.status_code == 404:
         return get_readme(repo, attempts + 1)
+    preprocessor = Preprocessor(readme_processor, 2).process
     return preprocessor(r.text)
 
 def get_ai_readmes(repos, workers):
@@ -59,8 +62,8 @@ def get_ai_readmes(repos, workers):
         texts = executor.map(get_readme, repos)
         return [t for t in texts if t]
     
-def get_embeddings(filename, size):
-    embeddings = np.ones((size, 100))
+def get_embeddings(filename, size, dims = 100):
+    embeddings = np.ones((size, dims))
     with open(filename, 'r') as f:
         j = 0
         for i,l in enumerate(f):
@@ -72,8 +75,14 @@ def get_embeddings(filename, size):
                 break
     return embeddings
 
-def get_sentence(i):
-    return linecache.getline('./prepared-readmes/repos.txt', i+1)
+def get_sentence(i, path):
+    return linecache.getline(path, i+1)
+
+def print_random(pos, amt=30, path = './prepared-readmes/repos.txt'):
+    print('Printing {}/{} positive documents'.format(amt, len(pos)))
+    np.random.shuffle(pos)
+    for p in pos[0:30]: 
+        print(get_sentence(p[0], path))
 
 def get_ss_embed(out):
     arr = out.split('\n')[4:]
@@ -85,15 +94,21 @@ def get_repo_name(i):
     """Get id from lookup... then get name from bigquery table? """
     pass
     
-def predict_ai(model, pos, X):
+def predict_ai(model, pos, X = None):
     """ pos is the positive class vectors, X is the entire dataset """    
     model = deepcopy(model)
     model.fit(pos)
+    if X is None:
+        return model
     preds = model.predict(X)
     return np.argwhere(preds == 1), model
+        
+def write_predictions(pos, filename):
+    with open(filename, 'w') as f:
+        for p in pos.reshape(-1):
+            f.write('{}\n'.format(p))
 
-def print_random(pos, amt=30):
-    print('Printing {}/{} positive documents'.format(amt, len(pos)))
-    np.random.shuffle(pos)
-    for p in pos[0:30]: 
-        print(get_sentence(p[0]))
+def get_predictions(filename):
+    with open(filename, 'r') as f:
+        return [int(i) for i in f.read().split('\n') if i]
+        

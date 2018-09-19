@@ -1,2 +1,2 @@
-rm memory.log
-while true; do free >> memory.log; sleep 5; done
+rm ${1}
+while true; do free -g >> ${1}; sleep 5; done

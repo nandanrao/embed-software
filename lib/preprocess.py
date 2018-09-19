@@ -1,20 +1,36 @@
 import re
 from sklearn.feature_extraction.text import strip_accents_ascii, strip_tags
 
+# PATTERNS
+############################
 headlines = re.compile(r"#+\s*[^\n]+\n")
 md_links = re.compile('\[[^\]]+\]\([^\)]+\)')
 sentance = re.compile(r"\.\s+")
 links = re.compile(r"https?://[^\s]+")
 code_ticks = re.compile(r"``?`?[^`]+``?`?")
 token_pattern = re.compile(r"(?u)\b\w\w+\b")
-tokenizer = lambda doc: token_pattern.findall(doc)
 underscore = re.compile(r"\w*_\w*")
 space = re.compile(r'\s+')
+num = re.compile(r'[0-9]+')
 
-def preprocessor(s):
+tokenizer = lambda doc: token_pattern.findall(doc)
 
-    char_count = len(s)
+def claims_processor(s, numbers = False):
+    # Lowercase
+    s = s.lower()
     
+    # Get rid of numbers in patents
+    if numbers is False:
+        s = re.sub(num, '', s) if s else None
+    
+    # URLs and ASCII only
+    s = re.sub(links, '', s)
+    s = strip_accents_ascii(s)
+    s = strip_tags(s)
+    
+    return s
+
+def readme_processor(s):
     # Capitalization won't help us
     s = s.lower()
 
@@ -32,16 +48,34 @@ def preprocessor(s):
     # never useful. Get rid of anything in camelcase? 
     s = re.sub(underscore, '', s)
 
-    # TODO: do make your "sentance" the whole paragraph? Closer to full document representation? 
-    # Split on sentances, tokenize within the sentance, then replace 
-    # sentance with \t separator for starspace/fasttext
-    s = [i for i in sentance.split(s)]
-    s = [' '.join(tokenizer(i)) for i in s]
-    sentences = [i for i in s if i]
-    s = '\t'.join(sentences)
+    
 
-    # Get rid of useless little readmes
-    if len(sentences) < 2 or char_count < 25:
-        return None
+class Preprocessor():
+    def __init__(self, string_processor, min_words_per_sentence, **kwargs):
+        self.string_processor = string_processor
+        self.min_words_per_sentence = min_words_per_sentence
+        self.string_processor_kwargs = kwargs
+    
+    def process(self, s):
+        MIN_SENTENCES_PER_DOC = 2
+        MIN_CHARS_PER_DOC = 25
+        char_count = len(s)
 
-    return s
+        s = self.string_processor(s, **self.string_processor_kwargs)
+
+        # TODO: do make your "sentance" the whole paragraph? Closer to full document representation? 
+        # Split on sentances, tokenize within the sentance, then replace 
+        # sentance with \t separator for starspace/fasttext
+        s = [i for i in sentance.split(s)]
+        s = [tokenizer(i) for i in s]
+        s = [' '.join(li_tokens) for li_tokens in s 
+             if len(li_tokens) >= self.min_words_per_sentence]
+        sentences = [i for i in s if i]
+
+        s = '\t'.join(sentences)
+
+        # Get rid of useless little documents
+        if len(sentences) < MIN_SENTENCES_PER_DOC or char_count < MIN_CHARS_PER_DOC:
+            return None
+
+        return s

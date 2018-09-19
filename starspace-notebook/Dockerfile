@@ -4,6 +4,16 @@
 
 FROM jupyter/datascience-notebook
 
+
+USER $NB_UID
+
+RUN \
+	conda install --quiet --yes \
+	'conda-forge::gensim' \
+	'hdmedians' \
+	'diskcache' \
+	'wordcloud'
+
 USER root
 
 WORKDIR /
@@ -12,12 +22,11 @@ WORKDIR /
 RUN \
 	apt-get update && apt-get install -y \
 	autoconf \
-    automake \
+    	automake \
 	libtool \
 	build-essential \
 	unzip \
-	git \
-	wget
+	git
 
 # build boost lib
 RUN \
@@ -35,3 +44,16 @@ RUN \
 	make print_ngrams && \
 	make query_predict && \
     mv -t /usr/local/bin starspace embed_doc query_nn print_ngrams query_predict
+
+USER $NB_UID
+
+RUN \
+	conda install --quiet --yes \
+	'conda-forge::gensim' \
+	'hdmedians' \		        
+	'diskcache' \			        
+	'wordcloud' \
+	'conda-forge::pymongo[srv,tls]'
+
+
+
