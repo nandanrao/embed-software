@@ -1,7 +1,8 @@
 import requests
+import re
 import numpy as np
 import linecache
-from lib.preprocess import preprocessor
+from .preprocess import preprocessor
 import concurrent
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
@@ -16,13 +17,26 @@ def get_ids(locs):
     with open('prepared-readmes/file_lookup.csv', 'r') as f:
         return [l.split(',')[0] for i,l in enumerate(f) if i in locs]
     
-def embed_docs(model_path, input):
-    p = subprocess.Popen(["embed_doc", model_path], 
+    
+def call_ss(commands, input):
+    p = subprocess.Popen(commands, 
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE, encoding='utf-8')    
 
     o,e = p.communicate(input=input)
+    return o,e    
+
+def query_predict(model_path, k, input):
+    out,err = call_ss(['query_predict'] + [model_path, str(k)], input)
+    arr = out.split('\n')[28:28+k]
+    arr = [a.split(':')[-1] for a in arr]
+    arr = [re.search(r'\d+', a)[0] for a in arr]
+    return [int(a) for a in arr]
+    
+def embed_docs(model_path, input):
+    o,e = call_ss(["embed_doc", model_path], input)
     return np.array(get_ss_embed(o))
+
 
 @cache.memoize(typed=True, expire=None, tag='readme')
 def get_readme(repo, attempts = 0):
