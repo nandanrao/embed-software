@@ -1,10 +1,10 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
-    name='embedsoftware',
-    version='0.0.1',
+    name='embed_software',
+    version='0.0.2',
     url='https://github.com/nandanrao/embed-software',
-    py_modules=['lib'],
+    packages=find_packages(),
     zip_safe=False,
     install_requires=[
         'pandas',

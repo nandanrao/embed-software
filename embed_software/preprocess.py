@@ -4,8 +4,6 @@ import pandas as pd
 from tqdm import tnrange, tqdm_notebook
 from multiprocessing import Pool
 import dataset
-import gcsfs
-import s3fs
 from os.path import join
 
 # PATTERNS
@@ -106,9 +104,9 @@ class ParallelProcessor():
                  outpath, 
                  content_key,                 
                  id_key,
+                 fs,
                  pandas_kwargs = {},
-                 cores = None,
-                 fs = gcsfs.GCSFileSystem(project='open-source-software')):
+                 cores = None):
         self.string_processor = string_processor
         self.inpath = inpath
         self.outpath = outpath
