@@ -2,7 +2,7 @@ import requests
 import re
 import numpy as np
 import linecache
-from lib.preprocess import Preprocessor, readme_processor
+from .preprocess import Preprocessor, readme_processor
 import concurrent
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce

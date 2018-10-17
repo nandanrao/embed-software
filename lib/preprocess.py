@@ -47,18 +47,23 @@ def readme_processor(s):
     # Underscores imply variable names, which are
     # never useful. Get rid of anything in camelcase? 
     s = re.sub(underscore, '', s)
-
+    return s
     
 
 class Preprocessor():
-    def __init__(self, string_processor, min_words_per_sentence, **kwargs):
+    def __init__(self, 
+                 string_processor, 
+                 min_words_per_sentence, 
+                 min_sentences_per_doc = 2,
+                 min_chars_per_doc = 25,
+                 **kwargs):
         self.string_processor = string_processor
         self.min_words_per_sentence = min_words_per_sentence
+        self.min_sentences_per_doc = min_sentences_per_doc
+        self.min_chars_per_doc = min_chars_per_doc
         self.string_processor_kwargs = kwargs
     
     def process(self, s):
-        MIN_SENTENCES_PER_DOC = 2
-        MIN_CHARS_PER_DOC = 25
         char_count = len(s)
 
         s = self.string_processor(s, **self.string_processor_kwargs)
@@ -75,7 +80,9 @@ class Preprocessor():
         s = '\t'.join(sentences)
 
         # Get rid of useless little documents
-        if len(sentences) < MIN_SENTENCES_PER_DOC or char_count < MIN_CHARS_PER_DOC:
+        if (len(sentences) < self.min_sentences_per_doc or 
+            char_count < self.min_chars_per_doc):
+            
             return None
 
         return s
