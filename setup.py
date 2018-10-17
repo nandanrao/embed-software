@@ -8,7 +8,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'pandas',
-        'sklearn',
+        'scikit-learn',
         'tqdm',
         'dataset',
         'diskcache'
