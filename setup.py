@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='embed_software',
+    name='embedsoftware',
     version='0.0.1',
     url='https://github.com/nandanrao/embed-software',
     py_modules=['lib'],
