@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Aug  8 16:19:38 2018
+"""Created on Wed Aug  8 16:19:38 2018
 
 @author: davidrosenfeld
 """
@@ -9,7 +8,6 @@ Created on Wed Aug  8 16:19:38 2018
 import pandas as pd
 import numpy as np
 import json, time, os, logging, pprint
-from pymongo import MongoClient
 from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from scipy.sparse import csr_matrix, lil_matrix
